@@ -1,0 +1,38 @@
+{
+  "name": "pi-herdr-extension",
+  "version": "0.1.0",
+  "description": "Keep Herdr's Pi pane working while sibling work such as async pi-subagents runs is active",
+  "type": "module",
+  "pi": {
+    "extensions": [
+      "./index.ts"
+    ]
+  },
+  "files": [
+    "index.ts",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "test": "node --test test/"
+  },
+  "peerDependencies": {
+    "@earendil-works/pi-coding-agent": "*"
+  },
+  "keywords": [
+    "pi",
+    "pi-package",
+    "pi-extension",
+    "herdr"
+  ],
+  "license": "MIT",
+  "author": "Xiangzhe",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/xz-dev/pi-herdr-extension.git"
+  },
+  "bugs": {
+    "url": "https://github.com/xz-dev/pi-herdr-extension/issues"
+  },
+  "homepage": "https://github.com/xz-dev/pi-herdr-extension#readme"
+}
