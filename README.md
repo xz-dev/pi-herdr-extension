@@ -36,6 +36,8 @@ Add this to `~/.pi/agent/settings.json`:
 
 `herdr integration install pi` can keep updating the managed file. If the file is missing, this extension does nothing.
 
+If Pi still auto-loads the managed file, both copies would report `herdr:pi` state and fight each other. In an interactive Herdr pane the extension detects this with Pi's own resource resolver, exits Pi with status 1, and prints the settings change above.
+
 ## Test
 
 ```bash

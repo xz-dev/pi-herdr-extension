@@ -1,7 +1,7 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import { existsSync } from "node:fs";
+import { existsSync, writeSync } from "node:fs";
 import { homedir } from "node:os";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 
 type Handler = (event: any, ctx: any) => unknown;
@@ -151,9 +151,53 @@ export function wrapOfficialIntegration(pi: ExtensionAPI, official: OfficialFact
 	official(proxiedPi);
 }
 
+/**
+ * Whether Pi also auto-loads the official file on its own. Uses Pi's own
+ * resolver, so global/project settings and +/-/! filters are all honored.
+ */
+async function officialAutoloaded(ctx: any, officialPath: string): Promise<boolean> {
+	const argv = process.argv;
+	if (argv.includes("--no-extensions") || argv.includes("-ne")) return false; // discovery disabled
+	const { DefaultPackageManager, SettingsManager, getAgentDir } = await import("@earendil-works/pi-coding-agent");
+	const agentDir = getAgentDir();
+	const settingsManager = SettingsManager.create(ctx.cwd, agentDir, { projectTrusted: ctx.isProjectTrusted?.() === true });
+	const resolved = await new DefaultPackageManager({ cwd: ctx.cwd, agentDir, settingsManager }).resolve(async () => "skip");
+	return resolved.extensions.some((entry) => entry.enabled && resolve(entry.path) === resolve(officialPath));
+}
+
+function duplicateLoadMessage(officialPath: string): string {
+	const settingsPath = join(officialPath, "..", "..", "settings.json");
+	return [
+		"",
+		"pi-herdr-extension: Herdr's managed Pi integration is also auto-loaded by Pi:",
+		`  ${officialPath}`,
+		"Both copies would report herdr:pi state for this pane and fight each other.",
+		"pi-herdr-extension loads that file itself, so stop Pi from auto-loading it.",
+		"",
+		`Add this entry to "extensions" in ${settingsPath} (keep any existing entries):`,
+		'  "extensions": ["-extensions/herdr-agent-state.ts"]',
+		"or run `pi config` and disable herdr-agent-state.ts. Keep the file installed.",
+		"Then start pi again.",
+		"",
+	].join("\n");
+}
+
 export default async function herdrExtension(pi: ExtensionAPI): Promise<void> {
 	const path = officialIntegrationPath();
 	if (!existsSync(path)) return; // herdr integration not installed; nothing to extend
+
+	// Same gate as the official integration: only the interactive pane owner reports.
+	pi.on("session_start", async (_event, ctx) => {
+		if (ctx.mode !== "tui" || process.env.HERDR_ENV !== "1") return;
+		if (!(await officialAutoloaded(ctx, path))) return;
+		// Print after the TUI restores the terminal; exit non-zero so scripts notice.
+		process.once("exit", () => {
+			writeSync(2, duplicateLoadMessage(path));
+			process.exitCode = 1;
+		});
+		ctx.shutdown();
+	});
+
 	const mod = await import(pathToFileURL(path).href);
 	const official = (mod?.default ?? mod) as OfficialFactory;
 	if (typeof official !== "function") return;
